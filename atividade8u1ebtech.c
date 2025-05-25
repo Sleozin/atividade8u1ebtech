@@ -4,6 +4,11 @@
 #include "pico/cyw43_arch.h"
 #include "lwip/tcp.h"
 #include <string.h>
+#include "hardware/i2c.h"
+#include "ssd1306.h"
+#include "display_utils.h"
+#include "big_string_drawer.h"
+#include <stdint.h>
 
 #define BOTAO_PIN 5
 #define LED_PIN 13
@@ -12,6 +17,17 @@
 int contador_botoes = 0;
 bool botao_esta_pressionado = false;
 absolute_time_t ultimo_tempo_botao = 0;
+extern struct render_area area;
+// === Buffer de vídeo do OLED (tela de 128 x 64) ===
+uint8_t ssd[ssd1306_buffer_length];
+
+// === Área de renderização usada por render_on_display() ===
+struct render_area area = {
+    .start_column = 0,
+    .end_column = ssd1306_width - 1,
+    .start_page = 0,
+    .end_page = ssd1306_n_pages - 1
+};
 
 #define WIFI_SSID "iPhone de Leonardo"
 #define WIFI_PASS "12345678"
@@ -42,6 +58,33 @@ void atualizar_estado_botao() {
             }
         }
     }
+}
+
+void Update_display() {
+    ssd1306_clear_display(ssd);
+    render_on_display(ssd, &area);  // Garante que a limpeza seja visível
+    sleep_ms(20);                   // Pequeno delay opcional
+
+    char* linha1 = "SISTEMA";
+    char* linha2 = "ALARME";
+    char linha3[30];
+
+    snprintf(linha3, sizeof(linha3), "INICIADO");
+
+    // Fonte padrão: 6 px por caractere, altura: 8 px
+    int x1 = (128 - strlen(linha1) * 6) / 2;
+    int x2 = (128 - strlen(linha2) * 6) / 2;
+    int x3 = (128 - strlen(linha3) * 6) / 2;
+
+    // Y = linha × altura da fonte (8 px padrão)
+    ssd1306_draw_string(ssd, x1, 0, linha1);    // Linha 0 (Y=0)
+    // Linha 1 = em branco (Y=8)
+    ssd1306_draw_string(ssd, x2, 16, linha2);   // Linha 2 (Y=16)
+    // Linha 3 = em branco (Y=24)
+
+    ssd1306_draw_string(ssd, 0, 56, linha3);  // Y = 32 
+
+    render_on_display(ssd, &area);
 }
 
 void criar_resposta_http() {
@@ -159,7 +202,8 @@ static void iniciar_servidor_http(void) {
 
 int main() {
     stdio_init_all();
-    
+    sleep_ms(1000);
+    i2c_init(i2c1, 400 * 1000);  // <---I2C primeiro
     // Configuração do hardware
     gpio_init(BOTAO_PIN);
     gpio_set_dir(BOTAO_PIN, GPIO_IN);
@@ -168,12 +212,19 @@ int main() {
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
     gpio_put(LED_PIN, 0);
+    gpio_set_function(14, GPIO_FUNC_I2C);
+    gpio_set_function(15, GPIO_FUNC_I2C);
+    gpio_pull_up(14);
+    gpio_pull_up(15);
+    ssd1306_init();
+    calculate_render_area_buffer_length(&area);
+    Update_display();
 
     printf("\n=== Iniciando Pico W ===\n");
     printf("Aguardando conexão WiFi...\n");
 
     if (cyw43_arch_init()) {
-        printf("Falha ao inicializar WiFi\n");
+        printf("Falha ao inicializar WiFi\n");  
         return 1;
     }
 
