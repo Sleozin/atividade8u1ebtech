@@ -9,6 +9,12 @@
 #include "display_utils.h"
 #include "big_string_drawer.h"
 #include <stdint.h>
+#include "lwip/netif.h"
+#include "lwip/pbuf.h"
+#include "lwip/tcp.h"
+
+#include "dhcpserver/dhcpserver.h"
+#include "dnsserver/dnsserver.h"
 
 #define BOTAO_PIN 5
 #define LED_PIN 13
@@ -29,8 +35,10 @@ struct render_area area = {
     .end_page = ssd1306_n_pages - 1
 };
 
+
 #define WIFI_SSID "iPhone de Leonardo"
-#define WIFI_PASS "12345678"
+#define WIFI_PASSWORD "12345678"
+#define WIFI_CHANNEL 6
 
 char estado_botao_str[50] = "Não pressionado";
 char http_response[2048];
@@ -223,33 +231,28 @@ int main() {
     printf("\n=== Iniciando Pico W ===\n");
     printf("Aguardando conexão WiFi...\n");
 
-    if (cyw43_arch_init()) {
-        printf("Falha ao inicializar WiFi\n");  
+    if (cyw43_arch_init_with_country(CYW43_COUNTRY_BRAZIL)) {
+        printf("Erro ao inicializar Wi-Fi\n");
         return 1;
     }
-
-    cyw43_arch_enable_sta_mode();
     
-    // Conecta ao WiFi
-    int tentativas = 0;
-    while (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASS, CYW43_AUTH_WPA2_AES_PSK, 10000) != 0) {
-        printf("Falha na conexão WiFi, tentativa %d\n", ++tentativas);
-        if (tentativas >= 3) {
-            printf("Não foi possível conectar ao WiFi\n");
-            return 1;
-        }
-        sleep_ms(2000);
-    }
-
-    printf("Conectado ao WiFi!\n");
-    printf("Endereço IP: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_list)));
+    // Configura modo AP
+    cyw43_arch_enable_ap_mode(WIFI_SSID, WIFI_PASSWORD, WIFI_CHANNEL);
     
-    iniciar_servidor_http();
-
+    // Configura IP estático
+    ip4_addr_t ipaddr, netmask, gw;
+    IP4_ADDR(&ipaddr, 192, 168, 4, 1);
+    IP4_ADDR(&netmask, 255, 255, 255, 0);
+    IP4_ADDR(&gw, 192, 168, 4, 1);
+    netif_set_addr(netif_default, &ipaddr, &netmask, &gw);
+    
+    printf("Access Point Configurado!\n");
+    printf("SSID: %s\n", WIFI_SSID);
+    printf("IP: 192.168.4.1\n");
+    
     while (true) {
-        cyw43_arch_poll();
-        atualizar_estado_botao();
-        sleep_ms(10); // Reduz o consumo de CPU
+        cyw43_arch_poll(); // Mantém o Wi-Fi ativo
+        sleep_ms(1000);
     }
     
     cyw43_arch_deinit();
