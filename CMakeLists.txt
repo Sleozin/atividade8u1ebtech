@@ -39,7 +39,9 @@ add_executable(atividade8u1ebtech atividade8u1ebtech.c
 inc/display_utils.c
 inc/big_string_drawer.c
 inc/ssd1306_i2c.c
-inc/font_big_logo_data.c)
+inc/font_big_logo_data.c
+dhcpserver/dhcpserver.c
+dnsserver/dnsserver.c)
 
 pico_set_program_name(atividade8u1ebtech "atividade8u1ebtech")
 pico_set_program_version(atividade8u1ebtech "0.1")
@@ -55,6 +57,8 @@ target_link_libraries(atividade8u1ebtech
 # Add the standard include files to the build
 target_include_directories(atividade8u1ebtech PRIVATE
         ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/inc
+        ${CMAKE_CURRENT_LIST_DIR}/dhcpserver
+        ${CMAKE_CURRENT_LIST_DIR}/dnsserver
 )
 
 # Add any user requested libraries
@@ -64,7 +68,13 @@ target_link_libraries(atividade8u1ebtech
         hardware_pwm
         hardware_i2c
         pico_cyw43_arch_lwip_threadsafe_background
+        pico_stdio_usb
         )
+
+# Configura IP fixo para o Access Point
+pico_configure_ip4_address(atividade8u1ebtech PRIVATE
+    CYW43_DEFAULT_IP_AP_ADDRESS 192.168.4.1
+)
 
 pico_add_extra_outputs(atividade8u1ebtech)
 
